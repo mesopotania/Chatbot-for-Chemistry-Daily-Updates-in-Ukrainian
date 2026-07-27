@@ -1,0 +1,17 @@
+name = "khimiya-shchodnya"
+main = "src/index.ts"
+compatibility_date = "2026-07-27"
+
+[triggers]
+crons = ["0 * * * *"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "khimiya-shchodnya-db"
+database_id = "00000000-0000-0000-0000-000000000000" # replace after `wrangler d1 create` in Task 16
+
+[vars]
+READER_CHAT_ID = "0" # replace with her real chat ID once she has tapped Start (Task 16)
+AUTHOR_CHAT_ID = "0" # replace with the author's own chat ID (Task 16)
+SEND_HOUR = "8"
+TIMEZONE = "Europe/Kyiv"
