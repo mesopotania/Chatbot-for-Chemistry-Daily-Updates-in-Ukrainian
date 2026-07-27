@@ -1,9 +1,9 @@
-CREATE TABLE seen (
+CREATE TABLE IF NOT EXISTS seen (
   url TEXT PRIMARY KEY,
   first_seen_at TEXT NOT NULL
 );
 
-CREATE TABLE sent (
+CREATE TABLE IF NOT EXISTS sent (
   send_date   TEXT PRIMARY KEY,
   url         TEXT NOT NULL,
   message_id  INTEGER NOT NULL,
@@ -12,13 +12,13 @@ CREATE TABLE sent (
   sent_at     TEXT NOT NULL
 );
 
-CREATE TABLE feedback (
+CREATE TABLE IF NOT EXISTS feedback (
   send_date TEXT PRIMARY KEY REFERENCES sent(send_date),
   button    TEXT NOT NULL,
   tapped_at TEXT NOT NULL
 );
 
-CREATE TABLE backlog_used (
+CREATE TABLE IF NOT EXISTS backlog_used (
   slug    TEXT PRIMARY KEY,
   used_at TEXT NOT NULL
 );
