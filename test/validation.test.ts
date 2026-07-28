@@ -27,4 +27,9 @@ describe('isUkrainianOnly', () => {
   it('rejects a Latin acronym that is not a valid element chain', () => {
     expect(isUkrainianOnly('Дослідники використали DNA-секвенування.')).toBe(false);
   });
+
+  it('allows Roman numerals used for centuries', () => {
+    expect(isUkrainianOnly('Це відбулося у XIX столітті.')).toBe(true);
+    expect(isUkrainianOnly('Подія XX століття.')).toBe(true);
+  });
 });
