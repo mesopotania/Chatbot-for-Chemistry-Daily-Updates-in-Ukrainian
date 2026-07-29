@@ -1,4 +1,4 @@
-# Хімія щодня
+# Chemistry Daily Bot
 
 A Telegram bot that sends one chemistry news story a day, in Ukrainian, to whoever's activated it.
 
