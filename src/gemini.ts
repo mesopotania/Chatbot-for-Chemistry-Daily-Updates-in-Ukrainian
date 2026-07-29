@@ -26,7 +26,6 @@ export async function generateJson(params: GenerateJsonParams): Promise<Generate
       generationConfig: {
         responseMimeType: 'application/json',
         responseSchema: params.schema,
-        thinkingConfig: { thinkingLevel: params.thinkingLevel },
       },
       safetySettings: [
         { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_ONLY_HIGH' },

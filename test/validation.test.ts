@@ -1,5 +1,20 @@
 import { describe, it, expect } from 'vitest';
-import { isUkrainianOnly, findDisallowedLatinTokens } from '../src/validation';
+import { isUkrainianOnly, findDisallowedLatinTokens, subscriptChemicalFormulas } from '../src/validation';
+
+describe('subscriptChemicalFormulas', () => {
+  it('converts plain-digit formulas to Unicode subscripts', () => {
+    expect(subscriptChemicalFormulas('Вода — H2O, а сірчана кислота — H2SO4.')).toBe('Вода — H₂O, а сірчана кислота — H₂SO₄.');
+    expect(subscriptChemicalFormulas('Глюкоза C6H12O6 та CO2.')).toBe('Глюкоза C₆H₁₂O₆ та CO₂.');
+  });
+
+  it('leaves ordinary numbers untouched (years, yields, quantities)', () => {
+    expect(subscriptChemicalFormulas('У 2026 році вихід склав 92% за 5 годин.')).toBe('У 2026 році вихід склав 92% за 5 годин.');
+  });
+
+  it('is idempotent on formulas already written with subscripts', () => {
+    expect(subscriptChemicalFormulas('Реакція дає CO₂ і H₂O.')).toBe('Реакція дає CO₂ і H₂O.');
+  });
+});
 
 describe('isUkrainianOnly', () => {
   it('accepts pure Ukrainian text', () => {

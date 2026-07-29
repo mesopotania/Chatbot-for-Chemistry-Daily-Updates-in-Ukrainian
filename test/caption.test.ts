@@ -17,13 +17,34 @@ describe('renderCaptionHtml', () => {
     const html = renderCaptionHtml(article);
     expect(html).toContain('<b>Новий каталізатор для фіксації азоту</b>');
     expect(html).toContain('<b>Чому це важливо:</b> Це важливо для агрохімії.');
-    expect(html).toContain('<a href="https://example.com/article">Джерело</a>');
+    expect(html).toContain('🔗 <a href="https://example.com/article">Читати повністю</a>');
     expect(html).toContain('Перший абзац з описом.');
   });
 
   it('escapes HTML-significant characters in generated text', () => {
     const withAmpersand: Article = { ...article, headline: 'Азот & кисень' };
     expect(renderCaptionHtml(withAmpersand)).toContain('Азот &amp; кисень');
+  });
+
+  it('converts **key info** markers into <b> tags in body and why-it-matters', () => {
+    const highlighted: Article = {
+      ...article,
+      paragraphs: ['Реакція дала **вихід 92%** за кімнатної температури.'],
+      whyMatters: 'Це **дешевший** шлях до аміаку.',
+    };
+    const html = renderCaptionHtml(highlighted);
+    expect(html).toContain('Реакція дала <b>вихід 92%</b> за кімнатної температури.');
+    expect(html).toContain('Це <b>дешевший</b> шлях до аміаку.');
+  });
+
+  it('escapes HTML before applying bold markers, so markup cannot be injected', () => {
+    const injection: Article = {
+      ...article,
+      paragraphs: ['Небезпечний **<script>** фрагмент.'],
+    };
+    const html = renderCaptionHtml(injection);
+    expect(html).toContain('<b>&lt;script&gt;</b>');
+    expect(html).not.toContain('<script>');
   });
 });
 

@@ -59,7 +59,7 @@ describe('generateJson', () => {
     expect(result.kind).toBe('error');
   });
 
-  it('sends the schema, thinking level, and safety settings in the request body', async () => {
+  it('sends the schema and safety settings in the request body', async () => {
     vi.mocked(fetch).mockResolvedValueOnce(
       geminiResponse({ candidates: [{ content: { parts: [{ text: '{}' }] }, finishReason: 'STOP' }] })
     );
@@ -68,7 +68,6 @@ describe('generateJson', () => {
     const body = JSON.parse((init as RequestInit).body as string);
     expect(body.generationConfig.responseMimeType).toBe('application/json');
     expect(body.generationConfig.responseSchema).toEqual(params.schema);
-    expect(body.generationConfig.thinkingConfig.thinkingLevel).toBe('high');
     expect(body.safetySettings.length).toBeGreaterThan(0);
   });
 });

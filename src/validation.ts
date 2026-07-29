@@ -31,3 +31,14 @@ export function findDisallowedLatinTokens(text: string): string[] {
 export function isUkrainianOnly(text: string): boolean {
   return findDisallowedLatinTokens(text).length === 0;
 }
+
+// Converts the plain ASCII digits inside recognised chemical formulas to Unicode
+// subscripts (CO2 -> CO₂, H2SO4 -> H₂SO₄). Only touches tokens that pass the
+// same formula check used by validation, so ordinary numbers — years, yields,
+// percentages — are left untouched. Idempotent: formulas already written with
+// subscripts contain no ASCII digits and pass through unchanged.
+export function subscriptChemicalFormulas(text: string): string {
+  return text.replace(LATIN_WORD, (token) =>
+    isChemicalFormula(token) ? token.replace(/[0-9]/g, (d) => String.fromCharCode(0x2080 + Number(d))) : token
+  );
+}

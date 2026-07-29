@@ -5,8 +5,8 @@ import * as articleFetch from '../src/articleFetch';
 import { Candidate } from '../src/types';
 
 const candidates: Candidate[] = [
-  { url: 'https://x/a', title: 'A', blurb: 'blurb A', publishedAt: '2026-07-27', sourceName: 'Chemistry World' },
-  { url: 'https://x/b', title: 'B', blurb: 'blurb B', publishedAt: '2026-07-26', sourceName: 'Chemistry World' },
+  { url: 'https://x/a', title: 'A', blurb: 'blurb A', publishedAt: '2026-07-27', sourceName: 'Chemistry World', imageUrl: null },
+  { url: 'https://x/b', title: 'B', blurb: 'blurb B', publishedAt: '2026-07-26', sourceName: 'Chemistry World', imageUrl: null },
 ];
 
 const goodWritingResult = {
@@ -65,8 +65,11 @@ describe('edit', () => {
     expect(article?.url).toBe('https://x/b');
   });
 
-  it('drops a candidate whose written body fails the Ukrainian-only check', async () => {
-    const englishBody = { ...goodWritingResult, paragraphs: ['This paragraph is in English.'] };
+  it('drops a candidate whose written body is substantially non-Ukrainian', async () => {
+    const englishBody = {
+      ...goodWritingResult,
+      paragraphs: ['This entire paragraph is written in plain English prose without any Ukrainian words at all here.'],
+    };
     vi.spyOn(gemini, 'generateJson')
       .mockResolvedValueOnce({ kind: 'ok', data: { selectedIndex: 0 } })
       .mockResolvedValueOnce({ kind: 'ok', data: englishBody })
@@ -90,7 +93,7 @@ describe('edit', () => {
   });
 
   it('asks the editor to shorten once when the caption is too long, then falls through if still over', async () => {
-    const tooLong = { ...goodWritingResult, paragraphs: [Array(950).fill('а').join('')] };
+    const tooLong = { ...goodWritingResult, paragraphs: [Array(3600).fill('а').join('')] };
     vi.spyOn(gemini, 'generateJson')
       .mockResolvedValueOnce({ kind: 'ok', data: { selectedIndex: 0 } })
       .mockResolvedValueOnce({ kind: 'ok', data: tooLong }) // too long

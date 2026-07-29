@@ -38,7 +38,7 @@ describe('sendPhoto', () => {
     expect(url).toBe('https://api.telegram.org/bottok/sendPhoto');
     const body = JSON.parse((init as RequestInit).body as string);
     expect(body.parse_mode).toBe('HTML');
-    expect(body.reply_markup.inline_keyboard).toHaveLength(2);
+    expect(body.reply_markup.inline_keyboard).toHaveLength(3);
   });
 });
 

@@ -25,34 +25,31 @@ afterEach(() => {
 });
 
 describe('send', () => {
-  it('sends exactly one sendPhoto call when an image is present', async () => {
-    const sendPhotoSpy = vi.spyOn(telegram, 'sendPhoto').mockResolvedValueOnce({ ok: true, messageId: 5 });
-    const sendMessageSpy = vi.spyOn(telegram, 'sendMessage');
+  it('sends one message with the image as an above-text preview when present', async () => {
+    let captured: telegram.SendMessageParams | undefined;
+    const sendMessageSpy = vi.spyOn(telegram, 'sendMessage').mockImplementationOnce(async (_t, p) => {
+      captured = p;
+      return { ok: true, messageId: 5 };
+    });
 
     const messageId = await send('tok', '1', articleWithImage);
 
     expect(messageId).toBe(5);
-    expect(sendPhotoSpy).toHaveBeenCalledTimes(1);
-    expect(sendMessageSpy).not.toHaveBeenCalled();
+    expect(sendMessageSpy).toHaveBeenCalledTimes(1);
+    expect(captured?.linkPreview).toEqual({ url: 'https://img/a.jpg', show_above_text: true, prefer_large_media: true });
   });
 
-  it('sends via sendMessage, with previews disabled, when there is no image', async () => {
-    const sendMessageSpy = vi.spyOn(telegram, 'sendMessage').mockResolvedValueOnce({ ok: true, messageId: 6 });
+  it('disables the preview when there is no image', async () => {
+    let captured: telegram.SendMessageParams | undefined;
+    vi.spyOn(telegram, 'sendMessage').mockImplementationOnce(async (_t, p) => {
+      captured = p;
+      return { ok: true, messageId: 6 };
+    });
 
     const messageId = await send('tok', '1', articleWithoutImage);
 
     expect(messageId).toBe(6);
-    expect(sendMessageSpy).toHaveBeenCalledTimes(1);
-  });
-
-  it('falls back to sendMessage when sendPhoto fails', async () => {
-    vi.spyOn(telegram, 'sendPhoto').mockResolvedValueOnce({ ok: false });
-    const sendMessageSpy = vi.spyOn(telegram, 'sendMessage').mockResolvedValueOnce({ ok: true, messageId: 7 });
-
-    const messageId = await send('tok', '1', articleWithImage);
-
-    expect(messageId).toBe(7);
-    expect(sendMessageSpy).toHaveBeenCalledTimes(1);
+    expect(captured?.linkPreview).toEqual({ is_disabled: true });
   });
 
   it('retries sendMessage with backoff and succeeds on the third attempt', async () => {
@@ -79,9 +76,9 @@ describe('send', () => {
     await assertion;
   });
 
-  it('renders a caption under the Telegram hard cap with all three buttons on two rows', async () => {
+  it('sends with the full reader keyboard: like/dislike, «Ще новини», and «Дізнатися більше»', async () => {
     let capturedMarkup: unknown;
-    vi.spyOn(telegram, 'sendPhoto').mockImplementationOnce(async (_token, params) => {
+    vi.spyOn(telegram, 'sendMessage').mockImplementationOnce(async (_token, params) => {
       capturedMarkup = params.replyMarkup;
       return { ok: true, messageId: 9 };
     });
@@ -94,6 +91,7 @@ describe('send', () => {
           { text: '❤️ Подобається', callback_data: 'like' },
           { text: '👎 Не цікаво', callback_data: 'dislike' },
         ],
+        [{ text: '📰 Ще новини', callback_data: 'news' }],
         [{ text: '🔍 Дізнатися більше', callback_data: 'more' }],
       ],
     });
