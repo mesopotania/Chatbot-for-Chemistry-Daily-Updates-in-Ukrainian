@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { env, createExecutionContext, waitOnExecutionContext } from 'cloudflare:test';
 import { applySchema } from './setup';
 import worker from '../src/index';
-import { getSentForDate } from '../src/db';
+import { getSentForDate, addRecipient } from '../src/db';
 import { FEED_SOURCES } from '../src/collector';
 import chemistryWorldXml from './fixtures/chemistry-world.xml?raw';
 
@@ -25,6 +25,7 @@ afterEach(() => {
 
 describe('scheduled pipeline', () => {
   it('sends exactly one message across 24 hourly ticks on the same Kyiv date', async () => {
+    await addRecipient(env.DB, '373430678', null, '2026-07-01T00:00:00Z');
     let telegramSendCount = 0;
     let geminiCallCount = 0;
 
@@ -66,6 +67,61 @@ describe('scheduled pipeline', () => {
 
     expect(telegramSendCount).toBe(1);
     expect(await getSentForDate(env.DB, '2026-07-27')).not.toBeNull();
+  });
+
+  it('does nothing (no send, no crash) when nobody has activated yet', async () => {
+    let telegramSendCount = 0;
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      if (input.toString().includes('api.telegram.org')) telegramSendCount++;
+      return new Response('', { status: 500 });
+    });
+    const now = new Date(Date.UTC(2026, 6, 27, 6, 0, 0)); // 09:00 Kyiv (SEND_HOUR)
+    const ctx = createExecutionContext();
+    await worker.scheduled({ cron: '0 * * * *', scheduledTime: now.getTime() } as ScheduledEvent, env, ctx);
+    await waitOnExecutionContext(ctx);
+    expect(telegramSendCount).toBe(0);
+  });
+
+  it('fans the same article out to every registered recipient', async () => {
+    await addRecipient(env.DB, '100', 'Grandma', '2026-07-01T00:00:00Z');
+    await addRecipient(env.DB, '200', 'Friend', '2026-07-01T00:00:01Z');
+    let geminiCallCount = 0;
+    const telegramChatIds: string[] = [];
+
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = input.toString();
+      if (url === FEED_SOURCES.find((s) => s.tier === 'core')!.url) {
+        return new Response(chemistryWorldXml, { status: 200 });
+      }
+      if (FEED_SOURCES.some((s) => s.url === url)) return new Response('', { status: 500 });
+      if (url.includes('generativelanguage.googleapis.com')) {
+        geminiCallCount++;
+        if (geminiCallCount === 1) return geminiOkResponse({ selectedIndex: 0 });
+        return geminiOkResponse({
+          headline: 'Заголовок',
+          paragraphs: ['Перший абзац.'],
+          why_matters: 'Це важливо.',
+          keywords: ['хімія'],
+          coined_term: null,
+        });
+      }
+      if (url.includes('api.telegram.org')) {
+        const body = JSON.parse((init?.body as string) ?? '{}');
+        telegramChatIds.push(String(body.chat_id));
+        return new Response(JSON.stringify({ ok: true, result: { message_id: telegramChatIds.length } }), { status: 200 });
+      }
+      if (url.includes('example.com')) {
+        return new Response('<html><body><p>Article body text.</p></body></html>', { status: 200 });
+      }
+      return new Response('', { status: 500 });
+    });
+
+    const now = new Date(Date.UTC(2026, 6, 27, 6, 0, 0)); // 09:00 Kyiv (SEND_HOUR)
+    const ctx = createExecutionContext();
+    await worker.scheduled({ cron: '0 * * * *', scheduledTime: now.getTime() } as ScheduledEvent, env, ctx);
+    await waitOnExecutionContext(ctx);
+
+    expect(telegramChatIds.sort()).toEqual(['100', '200']);
   });
 
   it('alerts the author when config is invalid, and does not crash', async () => {

@@ -1,6 +1,6 @@
 import schemaSql from '../schema.sql?raw';
 
-const TABLES = ['feedback', 'sent', 'seen', 'backlog_used'];
+const TABLES = ['feedback', 'sent', 'seen', 'backlog_used', 'recipients', 'extra_sent'];
 
 // vitest-pool-workers does not give each test its own D1 storage within a
 // file, so this both creates the schema (idempotent, safe on every call)

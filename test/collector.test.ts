@@ -12,7 +12,7 @@ beforeEach(async () => {
 });
 
 describe('parseRssItems', () => {
-  it('extracts title, link, description, and pubDate from each item', () => {
+  it('extracts title, link, description, pubDate, and image from each item', () => {
     const items = parseRssItems(chemistryWorldXml);
     expect(items).toHaveLength(2);
     expect(items[0]).toEqual({
@@ -20,7 +20,9 @@ describe('parseRssItems', () => {
       link: 'https://www.chemistryworld.com/news/new-catalyst-nitrogen',
       description: 'Researchers report a cobalt-based catalyst that fixes nitrogen at room temperature.',
       pubDate: 'Mon, 27 Jul 2026 06:00:00 GMT',
+      image: 'https://img.chemistryworld.com/nitrogen.jpg',
     });
+    expect(items[1].image).toBe(''); // no image tag on the second item
   });
 
   it('decodes XML entities outside of CDATA', () => {
@@ -58,8 +60,8 @@ describe('collect', () => {
 
   it('drops a URL that is already in sent', async () => {
     await env.DB
-      .prepare('INSERT INTO sent (send_date, url, message_id, headline, coined_term, sent_at) VALUES (?, ?, ?, ?, ?, ?)')
-      .bind('2026-07-20', 'https://www.chemistryworld.com/news/new-catalyst-nitrogen', 1, 'H', null, '2026-07-20T08:00:00Z')
+      .prepare('INSERT INTO sent (send_date, chat_id, url, message_id, headline, coined_term, sent_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      .bind('2026-07-20', '100', 'https://www.chemistryworld.com/news/new-catalyst-nitrogen', 1, 'H', null, '2026-07-20T08:00:00Z')
       .run();
     const candidates = await collect(env.DB, 'core', new Date('2026-07-27T08:00:00Z'));
     expect(candidates.some((c) => c.url === 'https://www.chemistryworld.com/news/new-catalyst-nitrogen')).toBe(false);

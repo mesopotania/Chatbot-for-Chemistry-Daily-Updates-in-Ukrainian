@@ -12,9 +12,9 @@ beforeEach(async () => {
 
 describe('sendWeeklyDigest', () => {
   it('sends the author a summary of the past week, including coined terms and taps', async () => {
-    await recordSent(env.DB, { sendDate: '2026-07-21', url: 'https://x/1', messageId: 1, headline: 'Заголовок 1', coinedTerm: 'нанопора', sentAt: '2026-07-21T08:00:00Z' });
-    await recordSent(env.DB, { sendDate: '2026-07-25', url: 'https://x/2', messageId: 2, headline: 'Заголовок 2', coinedTerm: null, sentAt: '2026-07-25T08:00:00Z' });
-    await upsertFeedback(env.DB, '2026-07-25', 'like', '2026-07-25T09:00:00Z');
+    await recordSent(env.DB, { sendDate: '2026-07-21', chatId: '100', url: 'https://x/1', messageId: 1, headline: 'Заголовок 1', coinedTerm: 'нанопора', sentAt: '2026-07-21T08:00:00Z' });
+    await recordSent(env.DB, { sendDate: '2026-07-25', chatId: '100', url: 'https://x/2', messageId: 2, headline: 'Заголовок 2', coinedTerm: null, sentAt: '2026-07-25T08:00:00Z' });
+    await upsertFeedback(env.DB, '2026-07-25', '100', 'like', '2026-07-25T09:00:00Z');
 
     const spy = vi.spyOn(telegram, 'sendMessage').mockResolvedValueOnce({ ok: true, messageId: 99 });
 
@@ -26,6 +26,22 @@ describe('sendWeeklyDigest', () => {
     expect(params.textHtml).toContain('Заголовок 1');
     expect(params.textHtml).toContain('нанопора');
     expect(params.textHtml).toContain('Заголовок 2');
+  });
+
+  it('dedupes multiple recipients on the same day into one line, with combined reactions', async () => {
+    await recordSent(env.DB, { sendDate: '2026-07-25', chatId: '100', url: 'https://x/1', messageId: 1, headline: 'Заголовок', coinedTerm: null, sentAt: '2026-07-25T08:00:00Z' });
+    await recordSent(env.DB, { sendDate: '2026-07-25', chatId: '200', url: 'https://x/1', messageId: 2, headline: 'Заголовок', coinedTerm: null, sentAt: '2026-07-25T08:00:01Z' });
+    await upsertFeedback(env.DB, '2026-07-25', '100', 'like', '2026-07-25T09:00:00Z');
+    await upsertFeedback(env.DB, '2026-07-25', '200', 'dislike', '2026-07-25T09:00:01Z');
+
+    const spy = vi.spyOn(telegram, 'sendMessage').mockResolvedValueOnce({ ok: true, messageId: 99 });
+    await sendWeeklyDigest(env.DB, 'tok', 'author-chat', new Date('2026-07-26T17:00:00Z'));
+
+    const [, params] = spy.mock.calls[0];
+    const occurrences = params.textHtml.split('Заголовок').length - 1;
+    expect(occurrences).toBe(1); // one line, not one per recipient
+    expect(params.textHtml).toContain('❤️ Подобається');
+    expect(params.textHtml).toContain('👎 Не цікаво');
   });
 
   it('sends nothing but an empty-week message when there is no sent history', async () => {

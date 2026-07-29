@@ -3,6 +3,7 @@ export interface RawRssItem {
   link: string;
   description: string;
   pubDate: string;
+  image: string;
 }
 
 function stripCdata(s: string): string {
@@ -20,6 +21,24 @@ function extractTag(itemXml: string, tag: string): string {
   return decodeXmlEntities(stripCdata(match[1]).trim());
 }
 
+// Reads an attribute off a self-closing / opening tag, e.g. the url="" on
+// <media:content>, <enclosure>, or <media:thumbnail>.
+function extractAttr(itemXml: string, tag: string, attr: string): string {
+  const match = itemXml.match(new RegExp(`<${tag}\\b[^>]*\\b${attr}="([^"]*)"`, 'i'));
+  return match ? decodeXmlEntities(match[1]) : '';
+}
+
+// Picks an image URL carried inside the RSS item itself, when present.
+// Chemistry World ships <enclosure>/<media:content>; Phys.org ships
+// <media:thumbnail>; ScienceDaily ships none. Larger media first.
+function extractImage(itemXml: string): string {
+  return (
+    extractAttr(itemXml, 'media:content', 'url') ||
+    extractAttr(itemXml, 'enclosure', 'url') ||
+    extractAttr(itemXml, 'media:thumbnail', 'url')
+  );
+}
+
 export function parseRssItems(xml: string): RawRssItem[] {
   const items: RawRssItem[] = [];
   const itemMatches = xml.match(/<item[^>]*>[\s\S]*?<\/item>/gi) ?? [];
@@ -27,7 +46,13 @@ export function parseRssItems(xml: string): RawRssItem[] {
     const link = extractTag(itemXml, 'link');
     const title = extractTag(itemXml, 'title');
     if (!link || !title) continue;
-    items.push({ title, link, description: extractTag(itemXml, 'description'), pubDate: extractTag(itemXml, 'pubDate') });
+    items.push({
+      title,
+      link,
+      description: extractTag(itemXml, 'description'),
+      pubDate: extractTag(itemXml, 'pubDate'),
+      image: extractImage(itemXml),
+    });
   }
   return items;
 }

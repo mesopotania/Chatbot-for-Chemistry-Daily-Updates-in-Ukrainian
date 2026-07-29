@@ -43,6 +43,7 @@ describe('shouldRunPipeline', () => {
   it('does not run twice on the same date even at the right hour', async () => {
     await recordSent(env.DB, {
       sendDate: '2026-07-27',
+      chatId: '100',
       url: 'https://x/a',
       messageId: 1,
       headline: 'A',

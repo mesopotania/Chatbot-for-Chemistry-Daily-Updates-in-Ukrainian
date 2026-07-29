@@ -6,12 +6,14 @@ export interface Candidate {
   blurb: string;
   publishedAt: string;
   sourceName: string;
+  imageUrl: string | null;
 }
 
 export interface Article {
   headline: string;
   paragraphs: string[];
   whyMatters: string;
+  keywords?: string[];
   coinedTerm: string | null;
   url: string;
   sourceName: string;
@@ -23,7 +25,7 @@ export interface Env {
   TELEGRAM_BOT_TOKEN: string;
   GEMINI_API_KEY: string;
   TELEGRAM_WEBHOOK_SECRET: string;
-  READER_CHAT_ID: string;
+  ACTIVATION_CODE_WORD: string;
   AUTHOR_CHAT_ID: string;
   SEND_HOUR: string;
   TIMEZONE: string;

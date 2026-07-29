@@ -7,15 +7,26 @@ const BUTTON_LABEL: Record<FeedbackButton, string> = {
   more: '🔍 Хоче більше',
 };
 
-function formatDigestText(sent: SentRow[], feedback: { sendDate: string; button: FeedbackButton }[]): string {
+function formatDigestText(sent: SentRow[], feedback: { sendDate: string; chatId: string; button: FeedbackButton }[]): string {
   if (sent.length === 0) {
     return 'Weekly digest: nothing was sent this week.';
   }
 
-  const feedbackByDate = new Map(feedback.map((f) => [f.sendDate, f.button]));
-  const lines = sent.map((row) => {
-    const tap = feedbackByDate.get(row.sendDate);
-    const tapLabel = tap ? BUTTON_LABEL[tap] : '(no reaction)';
+  // One row per recipient per day now — dedupe to one line per day (same
+  // article for everyone), and aggregate that day's reactions across recipients.
+  const byDate = new Map<string, SentRow>();
+  for (const row of sent) if (!byDate.has(row.sendDate)) byDate.set(row.sendDate, row);
+
+  const feedbackByDate = new Map<string, FeedbackButton[]>();
+  for (const f of feedback) {
+    const list = feedbackByDate.get(f.sendDate) ?? [];
+    list.push(f.button);
+    feedbackByDate.set(f.sendDate, list);
+  }
+
+  const lines = [...byDate.values()].map((row) => {
+    const taps = feedbackByDate.get(row.sendDate) ?? [];
+    const tapLabel = taps.length > 0 ? taps.map((b) => BUTTON_LABEL[b]).join(', ') : '(no reaction)';
     const coined = row.coinedTerm ? ` [coined term: ${row.coinedTerm}]` : '';
     return `${row.sendDate}: ${row.headline} — ${tapLabel}${coined}`;
   });

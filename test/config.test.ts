@@ -8,7 +8,7 @@ function fullEnv(overrides: Partial<Env> = {}): Env {
     TELEGRAM_BOT_TOKEN: 'token',
     GEMINI_API_KEY: 'key',
     TELEGRAM_WEBHOOK_SECRET: 'secret',
-    READER_CHAT_ID: '111',
+    ACTIVATION_CODE_WORD: 'відкриття',
     AUTHOR_CHAT_ID: '222',
     SEND_HOUR: '8',
     TIMEZONE: 'Europe/Kyiv',

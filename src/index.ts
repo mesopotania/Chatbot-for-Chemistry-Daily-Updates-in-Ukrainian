@@ -1,12 +1,11 @@
 import { Env } from './types';
 import { validateConfig, ConfigError } from './config';
 import { shouldRunPipeline, isDigestTick } from './scheduling';
-import { collect } from './collector';
-import { edit } from './editor';
+import { selectArticle, deliverOnDemandNews } from './pipeline';
 import { send } from './courier';
 import { handleWebhook } from './feedback';
 import { sendWeeklyDigest } from './digest';
-import { recordSent, pruneSeenOlderThan } from './db';
+import { recordSent, pruneSeenOlderThan, getRecipientChatIds } from './db';
 import { pickBacklogItem } from './backlog';
 import { sendMessage } from './telegram';
 
@@ -19,20 +18,11 @@ async function alertAuthor(env: Env, message: string): Promise<void> {
 }
 
 async function runDailyPipeline(env: Env, sendDate: string, now: Date): Promise<void> {
-  let article = null;
+  const recipients = await getRecipientChatIds(env.DB);
+  if (recipients.length === 0) return; // nobody has activated yet — nothing to send
+
+  let article = await selectArticle(env, now);
   let sentUrl: string | null = null;
-
-  const coreCandidates = await collect(env.DB, 'core', now);
-  if (coreCandidates.length > 0) {
-    article = await edit(coreCandidates, env.GEMINI_API_KEY);
-  }
-
-  if (!article) {
-    const wideningCandidates = await collect(env.DB, 'widening', now);
-    if (wideningCandidates.length > 0) {
-      article = await edit(wideningCandidates, env.GEMINI_API_KEY);
-    }
-  }
 
   if (article) {
     sentUrl = article.url;
@@ -49,22 +39,24 @@ async function runDailyPipeline(env: Env, sendDate: string, now: Date): Promise<
     return;
   }
 
-  let messageId: number;
-  try {
-    messageId = await send(env.TELEGRAM_BOT_TOKEN, env.READER_CHAT_ID, article);
-  } catch (err) {
-    await alertAuthor(env, `ALERT: Telegram send failed for ${sendDate}: ${(err as Error).message}`);
-    return;
+  // Same article to every recipient; one recipient's send failure does not
+  // block the others — each gets its own attempt and its own alert on failure.
+  for (const chatId of recipients) {
+    try {
+      const messageId = await send(env.TELEGRAM_BOT_TOKEN, chatId, article);
+      await recordSent(env.DB, {
+        sendDate,
+        chatId,
+        url: sentUrl,
+        messageId,
+        headline: article.headline,
+        coinedTerm: article.coinedTerm,
+        sentAt: now.toISOString(),
+      });
+    } catch (err) {
+      await alertAuthor(env, `ALERT: Telegram send failed for ${chatId} on ${sendDate}: ${(err as Error).message}`);
+    }
   }
-
-  await recordSent(env.DB, {
-    sendDate,
-    url: sentUrl,
-    messageId,
-    headline: article.headline,
-    coinedTerm: article.coinedTerm,
-    sentAt: now.toISOString(),
-  });
 }
 
 export default {
@@ -82,7 +74,9 @@ export default {
 
     const { run, sendDate } = await shouldRunPipeline(env.DB, env.TIMEZONE, Number(env.SEND_HOUR), now);
     if (run) {
-      ctx.waitUntil(runDailyPipeline(env, sendDate, now));
+      // Await (not waitUntil): a cron invocation gets generous time, and the
+      // daily send must actually complete, not be cancelled as a background task.
+      await runDailyPipeline(env, sendDate, now);
     }
 
     if (isDigestTick(env.TIMEZONE, now)) {
@@ -95,10 +89,21 @@ export default {
     }
   },
 
-  async fetch(request: Request, env: Env, _ctx: ExecutionContext): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
     if (url.pathname === '/webhook' && request.method === 'POST') {
-      return handleWebhook(request, env.DB, env.TELEGRAM_BOT_TOKEN, env.TELEGRAM_WEBHOOK_SECRET);
+      // Awaited inside handleWebhook — free-plan Workers cancel long waitUntil tasks.
+      const deliverMoreNews = (chatId: string) => deliverOnDemandNews(env, new Date(), chatId);
+      return handleWebhook(
+        request,
+        env.DB,
+        env.TELEGRAM_BOT_TOKEN,
+        env.TELEGRAM_WEBHOOK_SECRET,
+        env.AUTHOR_CHAT_ID,
+        env.ACTIVATION_CODE_WORD,
+        env.GEMINI_API_KEY,
+        deliverMoreNews
+      );
     }
     return new Response('ok');
   },
